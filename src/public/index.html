@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>订阅流量监控</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      padding-top: 1.5rem;
+      padding-bottom: 1.5rem;
+    }
+    .progress {
+      height: 25px;
+    }
+    .card {
+      margin-bottom: 1.5rem;
+    }
+    .history-item {
+      border-bottom: 1px solid #eee;
+      padding: 10px 0;
+    }
+    .history-item:last-child {
+      border-bottom: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="text-center mb-4">订阅流量监控</h1>
+    
+    <div class="row">
+      <div class="col-md-12">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="mb-0">当前总体用量</h5>
+          </div>
+          <div class="card-body">
+            <div id="loading" class="text-center">
+              <div class="spinner-border" role="status">
+                <span class="visually-hidden">加载中...</span>
+              </div>
+              <p>加载中...</p>
+            </div>
+            
+            <div id="error" class="alert alert-danger d-none" role="alert">
+              无法加载数据，请检查配置或网络连接
+            </div>
+            
+            <div id="data-container" class="d-none">
+              <div class="row mb-3">
+                <div class="col-md-6">
+                  <div class="progress mb-2">
+                    <div id="usage-bar" class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"></div>
+                  </div>
+                  <p id="usage-text" class="text-center"></p>
+                </div>
+                <div class="col-md-6">
+                  <table class="table table-bordered">
+                    <tr>
+                      <th>上传流量</th>
+                      <td id="upload"></td>
+                    </tr>
+                    <tr>
+                      <th>下载流量</th>
+                      <td id="download"></td>
+                    </tr>
+                    <tr>
+                      <th>总流量限制</th>
+                      <td id="total"></td>
+                    </tr>
+                    <tr>
+                      <th>到期时间</th>
+                      <td id="expire"></td>
+                    </tr>
+                    <tr>
+                      <th>上次更新</th>
+                      <td id="last-update"></td>
+                    </tr>
+                  </table>
+                </div>
+              </div>
+              
+              <div class="text-center">
+                <button id="refresh-btn" class="btn btn-primary">刷新数据</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 每日流量配额信息 -->
+    <div class="row">
+      <div class="col-md-12">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="mb-0">今日流量配额</h5>
+          </div>
+          <div class="card-body">
+            <div id="quota-loading" class="text-center">
+              <div class="spinner-border" role="status">
+                <span class="visually-hidden">加载中...</span>
+              </div>
+              <p>加载中...</p>
+            </div>
+            
+            <div id="quota-container" class="d-none">
+              <div class="row mb-3">
+                <div class="col-md-6">
+                  <div class="progress mb-2">
+                    <div id="today-usage-bar" class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"></div>
+                  </div>
+                  <p id="today-usage-text" class="text-center"></p>
+                </div>
+                <div class="col-md-6">
+                  <table class="table table-bordered">
+                    <tr>
+                      <th>今日已使用</th>
+                      <td id="today-used"></td>
+                    </tr>
+                    <tr>
+                      <th>今日配额</th>
+                      <td id="today-quota"></td>
+                    </tr>
+                    <tr>
+                      <th>日期类型</th>
+                      <td id="day-type"></td>
+                    </tr>
+                    <tr>
+                      <th>距离到期</th>
+                      <td id="days-until-expire"></td>
+                    </tr>
+                    <tr>
+                      <th>平均每日可用</th>
+                      <td id="daily-allowance"></td>
+                    </tr>
+                    <tr>
+                      <th>配额状态</th>
+                      <td id="quota-status"></td>
+                    </tr>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="row">
+      <div class="col-md-12">
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">历史记录</h5>
+            <button id="toggle-history" class="btn btn-sm btn-outline-secondary">显示历史</button>
+          </div>
+          <div id="history-container" class="card-body d-none">
+            <div id="history-loading" class="text-center">
+              <div class="spinner-border" role="status">
+                <span class="visually-hidden">加载中...</span>
+              </div>
+              <p>加载中...</p>
+            </div>
+            <div id="history-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // DOM 元素 - 总体使用情况
+    const loadingEl = document.getElementById('loading');
+    const errorEl = document.getElementById('error');
+    const dataContainerEl = document.getElementById('data-container');
+    const usageBarEl = document.getElementById('usage-bar');
+    const usageTextEl = document.getElementById('usage-text');
+    const uploadEl = document.getElementById('upload');
+    const downloadEl = document.getElementById('download');
+    const totalEl = document.getElementById('total');
+    const expireEl = document.getElementById('expire');
+    const lastUpdateEl = document.getElementById('last-update');
+    
+    // DOM 元素 - 每日流量配额
+    const quotaLoadingEl = document.getElementById('quota-loading');
+    const quotaContainerEl = document.getElementById('quota-container');
+    const todayUsageBarEl = document.getElementById('today-usage-bar');
+    const todayUsageTextEl = document.getElementById('today-usage-text');
+    const todayUsedEl = document.getElementById('today-used');
+    const todayQuotaEl = document.getElementById('today-quota');
+    const dayTypeEl = document.getElementById('day-type');
+    const daysUntilExpireEl = document.getElementById('days-until-expire');
+    const dailyAllowanceEl = document.getElementById('daily-allowance');
+    const quotaStatusEl = document.getElementById('quota-status');
+    
+    // DOM 元素 - 历史记录
+    const refreshBtnEl = document.getElementById('refresh-btn');
+    const toggleHistoryEl = document.getElementById('toggle-history');
+    const historyContainerEl = document.getElementById('history-container');
+    const historyLoadingEl = document.getElementById('history-loading');
+    const historyListEl = document.getElementById('history-list');
+    
+    // 获取最新订阅数据
+    async function fetchSubscriptionData() {
+      showLoading();
+      
+      try {
+        const response = await fetch('/api/subscription');
+        
+        if (!response.ok) {
+          throw new Error('无法获取数据');
+        }
+        
+        const data = await response.json();
+        displayData(data);
+      } catch (error) {
+        showError(error.message);
+      }
+    }
+    
+    // 获取历史数据
+    async function fetchHistoryData() {
+      historyLoadingEl.classList.remove('d-none');
+      historyListEl.innerHTML = '';
+      
+      try {
+        const response = await fetch('/api/subscription/history');
+        
+        if (!response.ok) {
+          throw new Error('无法获取历史数据');
+        }
+        
+        const data = await response.json();
+        displayHistoryData(data);
+      } catch (error) {
+        historyListEl.innerHTML = `<div class="alert alert-danger">加载历史数据失败: ${error.message}</div>`;
+      } finally {
+        historyLoadingEl.classList.add('d-none');
+      }
+    }
+    
+    // 手动更新数据
+    async function updateData() {
+      showLoading();
+      
+      try {
+        const response = await fetch('/api/subscription/update', {
+          method: 'POST'
+        });
+        
+        if (!response.ok) {
+          throw new Error('更新数据失败');
+        }
+        
+        const data = await response.json();
+        displayData(data);
+        
+        // 如果历史记录已显示，刷新历史数据
+        if (!historyContainerEl.classList.contains('d-none')) {
+          fetchHistoryData();
+        }
+      } catch (error) {
+        showError(error.message);
+      }
+    }
+    
+    // 显示加载状态
+    function showLoading() {
+      loadingEl.classList.remove('d-none');
+      errorEl.classList.add('d-none');
+      dataContainerEl.classList.add('d-none');
+      quotaLoadingEl.classList.remove('d-none');
+      quotaContainerEl.classList.add('d-none');
+    }
+    
+    // 显示错误信息
+    function showError(message) {
+      loadingEl.classList.add('d-none');
+      errorEl.classList.remove('d-none');
+      dataContainerEl.classList.add('d-none');
+      quotaLoadingEl.classList.add('d-none');
+      quotaContainerEl.classList.add('d-none');
+      
+      errorEl.textContent = `错误: ${message}`;
+    }
+    
+    // 显示数据
+    function displayData(data) {
+      loadingEl.classList.add('d-none');
+      errorEl.classList.add('d-none');
+      dataContainerEl.classList.remove('d-none');
+      quotaLoadingEl.classList.add('d-none');
+      quotaContainerEl.classList.remove('d-none');
+      
+      // 设置总流量进度条
+      let barClass = 'bg-success';
+      if (data.percentUsed > 90) {
+        barClass = 'bg-danger';
+      } else if (data.percentUsed > 70) {
+        barClass = 'bg-warning';
+      }
+      
+      usageBarEl.style.width = `${data.percentUsed}%`;
+      usageBarEl.setAttribute('aria-valuenow', data.percentUsed);
+      usageBarEl.className = `progress-bar ${barClass}`;
+      usageBarEl.textContent = `${data.percentUsed}%`;
+      
+      // 设置总使用量文本
+      usageTextEl.textContent = `已使用 ${data.usedFormatted} / ${data.totalFormatted}`;
+      
+      // 设置详细信息
+      uploadEl.textContent = data.uploadFormatted;
+      downloadEl.textContent = data.downloadFormatted;
+      totalEl.textContent = data.totalFormatted;
+      expireEl.textContent = data.expireDate;
+      lastUpdateEl.textContent = new Date().toLocaleString('zh-CN');
+      
+      // 显示每日流量配额信息
+      if (data.quotaInfo) {
+        const quotaInfo = data.quotaInfo;
+        
+        // 设置今日流量进度条
+        let todayBarClass = 'bg-success';
+        if (quotaInfo.todayPercentUsed > 90) {
+          todayBarClass = 'bg-danger';
+        } else if (quotaInfo.todayPercentUsed > 70) {
+          todayBarClass = 'bg-warning';
+        }
+        
+        todayUsageBarEl.style.width = `${quotaInfo.todayPercentUsed}%`;
+        todayUsageBarEl.setAttribute('aria-valuenow', quotaInfo.todayPercentUsed);
+        todayUsageBarEl.className = `progress-bar ${todayBarClass}`;
+        todayUsageBarEl.textContent = `${quotaInfo.todayPercentUsed}%`;
+        
+        // 设置今日使用量文本
+        todayUsageTextEl.textContent = `今日已使用 ${quotaInfo.todayUsedFormatted} / ${quotaInfo.todayQuotaFormatted}`;
+        
+        // 设置详细信息
+        todayUsedEl.textContent = quotaInfo.todayUsedFormatted;
+        todayQuotaEl.textContent = quotaInfo.todayQuotaFormatted;
+        dayTypeEl.textContent = quotaInfo.isWeekend ? '周末' : '工作日';
+        daysUntilExpireEl.textContent = `${quotaInfo.daysUntilExpire} 天`;
+        dailyAllowanceEl.textContent = quotaInfo.dailyAllowanceFormatted;
+        
+        if (quotaInfo.isQuotaSufficient) {
+          quotaStatusEl.textContent = '充足';
+          quotaStatusEl.className = 'text-success';
+        } else {
+          quotaStatusEl.textContent = '不足，请注意节约使用';
+          quotaStatusEl.className = 'text-danger';
+        }
+      }
+    }
+    
+    // 显示历史数据
+    function displayHistoryData(data) {
+      if (!data || data.length === 0) {
+        historyListEl.innerHTML = '<div class="alert alert-info">暂无历史数据</div>';
+        return;
+      }
+      
+      // 按时间逆序排序
+      data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      
+      let html = '';
+      for (const item of data) {
+        const date = new Date(item.timestamp).toLocaleString('zh-CN');
+        html += `
+          <div class="history-item">
+            <div class="d-flex justify-content-between">
+              <strong>${date}</strong>
+              <span>${item.percentUsed}%</span>
+            </div>
+            <div class="progress mt-1 mb-1" style="height: 10px;">
+              <div class="progress-bar ${item.percentUsed > 90 ? 'bg-danger' : item.percentUsed > 70 ? 'bg-warning' : 'bg-success'}" 
+                   role="progressbar" 
+                   style="width: ${item.percentUsed}%" 
+                   aria-valuenow="${item.percentUsed}" 
+                   aria-valuemin="0" 
+                   aria-valuemax="100"></div>
+            </div>
+            <div class="mb-1">总流量: ${item.usedFormatted} / ${item.totalFormatted}</div>
+            
+            ${item.quotaInfo ? `
+            <div class="progress mt-1 mb-1" style="height: 8px;">
+              <div class="progress-bar ${item.quotaInfo.todayPercentUsed > 90 ? 'bg-danger' : item.quotaInfo.todayPercentUsed > 70 ? 'bg-warning' : 'bg-success'}" 
+                   role="progressbar" 
+                   style="width: ${item.quotaInfo.todayPercentUsed}%" 
+                   aria-valuenow="${item.quotaInfo.todayPercentUsed}" 
+                   aria-valuemin="0" 
+                   aria-valuemax="100"></div>
+            </div>
+            <div>当日配额: ${item.quotaInfo.todayUsedFormatted} / ${item.quotaInfo.todayQuotaFormatted}</div>
+            ` : ''}
+          </div>
+        `;
+      }
+      
+      historyListEl.innerHTML = html;
+    }
+    
+    // 事件监听
+    refreshBtnEl.addEventListener('click', updateData);
+    
+    toggleHistoryEl.addEventListener('click', () => {
+      const isHidden = historyContainerEl.classList.contains('d-none');
+      
+      if (isHidden) {
+        historyContainerEl.classList.remove('d-none');
+        toggleHistoryEl.textContent = '隐藏历史';
+        fetchHistoryData();
+      } else {
+        historyContainerEl.classList.add('d-none');
+        toggleHistoryEl.textContent = '显示历史';
+      }
+    });
+    
+    // 初始加载
+    document.addEventListener('DOMContentLoaded', fetchSubscriptionData);
+  </script>
+</body>
+</html> 

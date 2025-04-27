@@ -1,0 +1,40 @@
+{
+  "name": "clash_subscription_monitor",
+  "version": "1.0.0",
+  "description": "Clash订阅流量监控服务",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JesseZhang97/clash_subscription_monitor.git"
+  },
+  "keywords": [
+    "clash",
+    "subscription",
+    "monitor",
+    "traffic"
+  ],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/JesseZhang97/clash_subscription_monitor/issues"
+  },
+  "homepage": "https://github.com/JesseZhang97/clash_subscription_monitor#readme",
+  "dependencies": {
+    "@fastify/cors": "^8.3.0",
+    "@fastify/static": "^6.12.0",
+    "@fastify/swagger": "^8.8.0",
+    "dotenv": "^16.3.1",
+    "fastify": "^4.21.0",
+    "moment": "^2.30.1",
+    "node-fetch": "^2.6.12",
+    "nodemailer": "^6.10.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
