@@ -11,10 +11,16 @@ function createTransporter() {
   }
 
   return nodemailer.createTransport({
-    service: config.email.service,
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
     auth: {
       user: config.email.user,
       pass: config.email.pass
+    },
+    tls: {
+      // 不验证证书
+      rejectUnauthorized: false
     }
   });
 }
@@ -42,6 +48,9 @@ async function sendEmail(subject, html) {
       return false;
     }
 
+    // 验证连接
+    await transporter.verify();
+
     const mailOptions = {
       from: config.email.user,
       to: config.email.to,
@@ -54,6 +63,13 @@ async function sendEmail(subject, html) {
     return true;
   } catch (error) {
     console.error('邮件发送失败:', error.message);
+    if (error.code === 'ECONNECTION') {
+      console.error('连接错误，请检查网络连接');
+    } else if (error.code === 'EAUTH') {
+      console.error('认证失败，请检查邮箱和密码是否正确');
+    } else if (error.code === 'ETIMEDOUT') {
+      console.error('连接超时，请检查网络连接');
+    }
     return false;
   }
 }
